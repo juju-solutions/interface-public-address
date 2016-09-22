@@ -9,11 +9,12 @@ class PublicAddressRequires(RelationBase):
 
     @hook('{requires:public-address}-relation-{joined,changed}')
     def changed(self):
-        conversation = self.conversation()
-        if conversation.get_remote('port'):
-            # this unit's conversation has a port, so
+        conv = self.conversation()
+        conv.set_state('{relation_name}.connected')
+        if conv.get_remote('port') and conv.get_remote('public-address'):
+            # this unit's conversation has a port, and public-address so
             # it is part of the set of available units
-            conversation.set_state('{relation_name}.available')
+            conv.set_state('{relation_name}.available')
 
     @hook('{requires:public-address}-relation-{departed,broken}')
     def broken(self):
