@@ -31,27 +31,13 @@ class PublicAddressRequires(Endpoint):
                 # ...
             ]
         '''
-        hosts = []
-        dup_list = {}
+        hosts = set()
         for relation in self.relations:
             for unit in relation.joined_units:
                 data = unit.received_raw
-                # remove duplicates
-                key = '{}.{}'.format(data['public-address'],
-                                     data['port'])
-                if key not in dup_list:
-                    dup_list[key] = 1
-                    hosts.append({'public-address': data['public-address'],
-                                  'port': data['port']})
+                hosts.add((data['public-address'], data['port']))
                 if 'extended_data' in data:
                     for ed in json.loads(data['extended_data']):
-                        # remove duplicates
-                        key = '{}.{}'.format(data['public-address'],
-                                             data['port'])
-                        if key not in dup_list:
-                            dup_list[key] = 1
-                            host = {'public-address': ed['public-address'],
-                                    'port': ed['port']}
-                            hosts.append(host)
+                        hosts.add((ed['public-address'], ed['port']))
 
-        return hosts
+        return [{'public-address': pa, 'port': p} for pa, p in hosts]
