@@ -1,25 +1,22 @@
-from charms.reactive import hook
-from charms.reactive import RelationBase
-from charms.reactive import scopes
+import json
+
+from charms.reactive import when, when_not
+from charms.reactive import set_flag, clear_flag
+from charms.reactive import Endpoint
 
 
-class PublicAddressRequires(RelationBase):
-    '''The class that requires a public address to another unit.'''
-    scope = scopes.UNIT
+class PublicAddressRequires(Endpoint):
 
-    @hook('{requires:public-address}-relation-{joined,changed}')
+    @when('endpoint.{endpoint_name}.changed')
     def changed(self):
-        conv = self.conversation()
-        conv.set_state('{relation_name}.connected')
-        if conv.get_remote('port') and conv.get_remote('public-address'):
-            # this unit's conversation has a port, and public-address so
-            # it is part of the set of available units
-            conv.set_state('{relation_name}.available')
+        if any(unit.received_raw['port'] and
+               unit.received_raw['public-address']
+               for unit in self.all_joined_units):
+            set_flag(self.expand_name('{endpoint_name}.available'))
 
-    @hook('{requires:public-address}-relation-{departed,broken}')
+    @when_not('endpoint.{endpoint_name}.joined')
     def broken(self):
-        conversation = self.conversation()
-        conversation.remove_state('{relation_name}.available')
+        clear_flag(self.expand_name('{endpoint_name}.available'))
 
     def get_addresses_ports(self):
         '''Returns a list of available HTTP providers and their associated
@@ -34,10 +31,13 @@ class PublicAddressRequires(RelationBase):
                 # ...
             ]
         '''
-        hosts = []
-        for conversation in self.conversations():
-            address = conversation.get_remote('public-address')
-            port = conversation.get_remote('port')
-            if address and port:
-                hosts.append({'public-address': address, 'port': port})
-        return hosts
+        hosts = set()
+        for relation in self.relations:
+            for unit in relation.joined_units:
+                data = unit.received_raw
+                hosts.add((data['public-address'], data['port']))
+                if 'extended_data' in data:
+                    for ed in json.loads(data['extended_data']):
+                        hosts.add((ed['public-address'], ed['port']))
+
+        return [{'public-address': pa, 'port': p} for pa, p in hosts]
