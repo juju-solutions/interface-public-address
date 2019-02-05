@@ -1,6 +1,6 @@
 import json
 
-from charms.reactive import when, when_not
+from charms.reactive import when, hook
 from charms.reactive import set_flag, clear_flag
 from charms.reactive import Endpoint
 
@@ -14,9 +14,10 @@ class PublicAddressRequires(Endpoint):
                for unit in self.all_joined_units):
             set_flag(self.expand_name('{endpoint_name}.available'))
 
-    @when_not('endpoint.{endpoint_name}.joined')
+    @hook('{requires:public-address}-relation-departed')
     def broken(self):
-        clear_flag(self.expand_name('{endpoint_name}.available'))
+        if not self.is_joined:
+            clear_flag(self.expand_name('{endpoint_name}.available'))
 
     def get_addresses_ports(self):
         '''Returns a list of available HTTP providers and their associated
