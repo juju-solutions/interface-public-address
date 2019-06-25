@@ -40,4 +40,6 @@ class PublicAddressRequires(Endpoint):
                     for ed in json.loads(data['extended_data']):
                         hosts.add((ed['public-address'], ed['port']))
 
-        return [{'public-address': pa, 'port': p} for pa, p in sorted(hosts)]
+        return [{'public-address': pa, 'port': p}
+                for pa, p in sorted(host for host in hosts
+                                    if None not in host)]
