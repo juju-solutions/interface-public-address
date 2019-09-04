@@ -1,22 +1,22 @@
 import json
 
-from charms.reactive import when, when_not
-from charms.reactive import set_flag, clear_flag
+from charms.reactive import toggle_flag
 from charms.reactive import Endpoint
 
 
 class PublicAdddressProvides(Endpoint):
 
-    @when('endpoint.{endpoint_name}.joined')
-    def joined(self):
-        set_flag(self.expand_name('{endpoint_name}.available'))
+    def manage_flags(self):
+        toggle_flag(self.expand_name('{endpoint_name}.available'),
+                    self.is_joined)
 
-    @when_not('endpoint.{endpoint_name}.joined')
-    def broken(self):
-        clear_flag(self.expand_name('{endpoint_name}.available'))
-
-    def set_address_port(self, address, port):
-        # Iterate over all conversations of this type to send data to everyone.
+    def set_address_port(self, address, port, relation=None):
+        if relation is None:
+            # no relation specified, so send the same data to everyone
+            relations = self.relations
+        else:
+            # specific relation given, so only send the data to that one
+            relations = [relation]
         if type(address) is list:
             # build 2 lists to zip together that are the same length
             length = len(address)
@@ -29,9 +29,32 @@ class PublicAdddressProvides(Endpoint):
             # entry for the other entries.
             first = clients.pop(0)
             first['extended_data'] = json.dumps(clients)
-            for relation in self.relations:
+            for relation in relations:
                 relation.to_publish_raw.update(first)
         else:
-            for relation in self.relations:
+            for relation in relations:
                 relation.to_publish_raw.update({'public-address': address,
                                                 'port': port})
+
+    @property
+    def requests(self):
+        return [Request(rel) for rel in self.relations]
+
+
+class Request:
+    def __init__(self, rel):
+        self.rel = rel
+
+    @property
+    def application_name(self):
+        return self.rel.application_name
+
+    @property
+    def members(self):
+        return [(u.received_raw.get('ingress-address',
+                                    u.received_raw['private-address']),
+                 u.received_raw.get('port', '6443'))
+                for u in self.rel.joined_units]
+
+    def set_address_port(self, address, port):
+        self.rel.endpoint.set_address_port(address, port, self.rel)
