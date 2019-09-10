@@ -1,22 +1,21 @@
 import json
 
-from charms.reactive import when, set_flag, Endpoint
-from charms.reactive.flags import register_trigger
+from charms.reactive import toggle_flag, Endpoint
 
 
 class PublicAddressRequires(Endpoint):
-    def register_triggers(self):
-        register_trigger(
-            when_not=self.expand_name('endpoint.{endpoint_name}.joined'),
-            clear_flag=self.expand_name('{endpoint_name}.available')
-        )
+    def manage_flags(self):
+        toggle_flag(self.expand_name('{endpoint_name}.available'),
+                    len(self.get_addresses_ports()) > 0)
 
-    @when('endpoint.{endpoint_name}.changed')
-    def changed(self):
-        if any(unit.received_raw['port'] and
-               unit.received_raw['public-address']
-               for unit in self.all_joined_units):
-            set_flag(self.expand_name('{endpoint_name}.available'))
+    def set_backend_port(self, port):
+        """
+        Set the port that the backend service is listening on.
+
+        Defaults to 6443 if not set.
+        """
+        for rel in self.relations:
+            rel.to_publish_raw['port'] = str(port)
 
     def get_addresses_ports(self):
         '''Returns a list of available HTTP providers and their associated
@@ -25,8 +24,8 @@ class PublicAddressRequires(Endpoint):
         The return value is a list of dicts of the following form::
             [
                 {
-                    'public-address': address_of_host,
-                    'port': port_for_host,
+                    'public-address': address_for_frontend,
+                    'port': port_for_frontend,
                 },
                 # ...
             ]
